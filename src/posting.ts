@@ -75,6 +75,7 @@ export class Ledger {
   readonly #pending = new Map<string, Pending<Currency>>();
   readonly #posted = new Map<string, Posted<Currency>>();
   readonly #reversed = new Map<string, Reversed<Currency>>();
+  readonly #reversalOf = new Map<string, Reversed<Currency>>();
 
   prepare<C extends Currency>(lines: readonly Line<C>[], key: IdempotencyKey): Pending<C> {
     const posted = this.#posted.get(key);
@@ -117,13 +118,20 @@ export class Ledger {
   }
 
   reverse<C extends Currency>(entry: Posted<C>, at: string): Reversed<C> {
-    const already = this.#reversed.get(entry.key);
-    if (already !== undefined) {
-      return already as Reversed<C>;
+    const linked = this.#reversalOf.get(entry.key);
+    if (linked !== undefined) {
+      return linked as Reversed<C>;
     }
     const posted = this.#posted.get(entry.key);
     if (posted === undefined) {
       throw new Error("only a posted entry can be reversed");
+    }
+    const reversalRaw = `${posted.key}:rev`;
+    if (!/^[A-Za-z0-9:_-]{8,80}$/.test(reversalRaw)) {
+      throw new Error("reversal key must be 8 to 80 url-safe characters");
+    }
+    if (this.#posted.has(reversalRaw) || this.#pending.has(reversalRaw)) {
+      throw new Error("reversal key already used");
     }
     const lines = posted.lines.map((line) => ({
       account: line.account,
@@ -132,14 +140,14 @@ export class Ledger {
     }));
     const reversed: Reversed<C> = {
       state: "reversed",
-      key: entry.key,
-      currency: entry.currency,
+      key: reversalRaw as IdempotencyKey,
+      currency: posted.currency as C,
       lines: lines as unknown as readonly Line<C>[],
       at,
-      reverses: entry.key,
+      reverses: posted.key as IdempotencyKey,
     };
-    this.#posted.delete(entry.key);
-    this.#reversed.set(entry.key, reversed);
+    this.#reversed.set(reversalRaw, reversed);
+    this.#reversalOf.set(posted.key, reversed);
     return reversed;
   }
 

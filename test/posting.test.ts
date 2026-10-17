@@ -175,11 +175,14 @@ describe("postings", () => {
     const reversed = ledger.reverse(posted, "2026-10-17T15:00:00Z");
     expect(reversed.state).toBe("reversed");
     expect(reversed.reverses).toBe(key);
+    expect(reversed.key).toBe(idempotencyKey("invoice-1004:rev"));
     expect(reversed.lines[0]?.side).toBe("credit");
     expect(reversed.lines[1]?.side).toBe("debit");
     expect(reversed.lines[0]?.amount).toBe(amount);
+    expect(ledger.get(key)?.state).toBe("posted");
+    expect(ledger.get(key)?.lines[0]?.side).toBe("debit");
+    expect(ledger.get(reversed.key)?.state).toBe("reversed");
     expect(ledger.reverse(posted, "2026-10-17T16:00:00Z").at).toBe("2026-10-17T15:00:00Z");
-    expect(ledger.get(key)?.state).toBe("reversed");
     const stray = { ...pending, key: idempotencyKey("missing-01") };
     expect(() => ledger.commit(stray, at)).toThrow(/unknown pending/);
     expect(() => ledger.reverse({ ...posted, key: idempotencyKey("missing-02") }, at)).toThrow(
@@ -209,7 +212,99 @@ describe("postings", () => {
         ],
         key,
       ),
+    ).toThrow(/already posted/);
+    expect(() =>
+      ledger.prepare(
+        [
+          { account: cash, side: "debit", amount },
+          { account: revenue, side: "credit", amount },
+        ],
+        idempotencyKey("invoice-1005:rev"),
+      ),
     ).toThrow(/already reversed/);
+  });
+
+  it("reads the stored currency and keeps both entries", () => {
+    const { cash, revenue } = usdBooks();
+    const ledger = new Ledger();
+    const key = idempotencyKey("invoice-1006");
+    const amount = minor("USD", 50n);
+    const posted = ledger.commit(
+      ledger.prepare(
+        [
+          { account: cash, side: "debit", amount },
+          { account: revenue, side: "credit", amount },
+        ],
+        key,
+      ),
+      at,
+    );
+    const forged = { ...posted, currency: "EUR" as const };
+    const reversed = ledger.reverse(forged as Posted<"EUR">, at);
+    expect(reversed.currency).toBe("USD");
+    expect(ledger.get(key)?.currency).toBe("USD");
+  });
+
+  it("rejects a reversal key that does not fit or is already used", () => {
+    const { cash, revenue } = usdBooks();
+    const ledger = new Ledger();
+    const longKey = idempotencyKey("k".repeat(78));
+    const amount = minor("USD", 10n);
+    const posted = ledger.commit(
+      ledger.prepare(
+        [
+          { account: cash, side: "debit", amount },
+          { account: revenue, side: "credit", amount },
+        ],
+        longKey,
+      ),
+      at,
+    );
+    expect(() => ledger.reverse(posted, at)).toThrow(/reversal key/);
+
+    const other = new Ledger();
+    const original = idempotencyKey("invoice-1007");
+    other.commit(
+      other.prepare(
+        [
+          { account: cash, side: "debit", amount },
+          { account: revenue, side: "credit", amount },
+        ],
+        idempotencyKey("invoice-1007:rev"),
+      ),
+      at,
+    );
+    const target = other.commit(
+      other.prepare(
+        [
+          { account: cash, side: "debit", amount },
+          { account: revenue, side: "credit", amount },
+        ],
+        original,
+      ),
+      at,
+    );
+    expect(() => other.reverse(target, at)).toThrow(/reversal key already used/);
+
+    const pendingLedger = new Ledger();
+    pendingLedger.prepare(
+      [
+        { account: cash, side: "debit", amount },
+        { account: revenue, side: "credit", amount },
+      ],
+      idempotencyKey("invoice-1008:rev"),
+    );
+    const pendingTarget = pendingLedger.commit(
+      pendingLedger.prepare(
+        [
+          { account: cash, side: "debit", amount },
+          { account: revenue, side: "credit", amount },
+        ],
+        idempotencyKey("invoice-1008"),
+      ),
+      at,
+    );
+    expect(() => pendingLedger.reverse(pendingTarget, at)).toThrow(/reversal key already used/);
   });
 });
 
