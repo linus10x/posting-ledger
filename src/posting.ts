@@ -125,11 +125,16 @@ export class Ledger {
     if (posted === undefined) {
       throw new Error("only a posted entry can be reversed");
     }
+    const lines = posted.lines.map((line) => ({
+      account: line.account,
+      side: line.side === "debit" ? ("credit" as const) : ("debit" as const),
+      amount: line.amount,
+    }));
     const reversed: Reversed<C> = {
       state: "reversed",
       key: entry.key,
       currency: entry.currency,
-      lines: posted.lines as readonly Line<C>[],
+      lines: lines as unknown as readonly Line<C>[],
       at,
       reverses: entry.key,
     };

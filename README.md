@@ -15,7 +15,7 @@ Research notes from 2026-10-17: Claude.ai kept the ledger and said to leave the 
 - `ISO_4217` is a closed set: USD, EUR, GBP, JPY. The exponent is 2, except JPY, which is 0. `minor("USDX", 1n)` is a type error. A runtime string goes through `assertCurrency`.
 - `Minor<C>` is a `bigint` branded by `C`. `add` accepts two amounts only when both type parameters are the same currency.
 - `Account<C>` carries the same brand. A `Line<"USD">` cannot hold a EUR account.
-- `prepare` checks that every line shares one currency and that debits equal credits. `commit` turns a `Pending<C>` into a `Posted<C>`. `reverse` accepts only a `Posted<C>`.
+- `prepare` checks that every line shares one currency and that debits equal credits. `commit` turns a `Pending<C>` into a `Posted<C>`. `reverse` accepts only a `Posted<C>` and stores the same amounts with debit and credit swapped, so the offset nets the original entry to zero inside this store.
 - The store returns the first committed entry for an idempotency key.
 
 ## Usage
@@ -55,4 +55,4 @@ On this machine (Node v25.9.0, 2026-10-17), `npm run bench` posted 20,000 balanc
 
 ## Limits
 
-The currency set is four ISO 4217 alphabetic codes, not the full standard. Amounts are non-negative minor units. There is no persistence, no multi-currency journal entry, and no interest or tax rule. A cast can still bypass the brand at runtime. The mixed-currency check runs again inside `prepare` for that case.
+The currency set is four ISO 4217 alphabetic codes, not the full standard. Amounts are non-negative minor units. The ledger is in memory. A process restart drops every entry. Reverse is an offsetting entry in that same memory store, not a separate durable transaction journal. There is no multi-currency journal entry and no interest or tax rule. A cast can still bypass the brand at runtime. The mixed-currency check runs again inside `prepare` for that case.

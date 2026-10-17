@@ -175,6 +175,9 @@ describe("postings", () => {
     const reversed = ledger.reverse(posted, "2026-10-17T15:00:00Z");
     expect(reversed.state).toBe("reversed");
     expect(reversed.reverses).toBe(key);
+    expect(reversed.lines[0]?.side).toBe("credit");
+    expect(reversed.lines[1]?.side).toBe("debit");
+    expect(reversed.lines[0]?.amount).toBe(amount);
     expect(ledger.reverse(posted, "2026-10-17T16:00:00Z").at).toBe("2026-10-17T15:00:00Z");
     expect(ledger.get(key)?.state).toBe("reversed");
     const stray = { ...pending, key: idempotencyKey("missing-01") };
