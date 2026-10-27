@@ -19,9 +19,16 @@
       }
     }
   },
-  "files": ["dist", "README.md", "LICENSE", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
   "sideEffects": false,
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
@@ -33,15 +40,20 @@
   "devDependencies": {
     "@eslint/js": "^9.36.0",
     "@types/node": "^24.7.0",
-    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/coverage-v8": "^4.1.12",
     "eslint": "^9.36.0",
     "tsd": "^0.33.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.45.0",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.12"
   },
   "tsd": {
     "directory": "test-d"
+  },
+  "overrides": {
+    "tinypool": ">=2.1.2",
+    "esbuild": ">=0.28.1",
+    "@vitest/mocker": ">=4.1.12"
   }
 }
